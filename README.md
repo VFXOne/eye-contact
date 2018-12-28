@@ -1,2 +1,2 @@
-# eye-contact
-Bachelor semester project at VITA lab (EPFL)
+# Eye contact detection
+This project is my bachelor semester project at the VITA laboratory (EPFL).
