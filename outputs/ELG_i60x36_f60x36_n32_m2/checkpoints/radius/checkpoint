@@ -1,0 +1,3 @@
+model_checkpoint_path: "/home/wookie/github/hg_gaze/outputs/HGgaze_i60x36_f60x36_n32_m2/checkpoints/radius/model-4672654"
+all_model_checkpoint_paths: "/home/wookie/github/hg_gaze/outputs/HGgaze_i60x36_f60x36_n32_m2/checkpoints/radius/model-4667961"
+all_model_checkpoint_paths: "/home/wookie/github/hg_gaze/outputs/HGgaze_i60x36_f60x36_n32_m2/checkpoints/radius/model-4672654"
