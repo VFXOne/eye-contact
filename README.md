@@ -24,6 +24,10 @@ Or from a video, in this case you have to provide the path of the video. For exa
 cd src
 python eye-contact.py --from_video my-video.mp4
 ```
+To list the available commands, type
+```
+python eye-contact.py --help
+```
 
 ## Evaluation
 This algorithm has been tested on the [Columbia Gaze dataset](http://www.cs.columbia.edu/CAVE/databases/columbia_gaze/).
