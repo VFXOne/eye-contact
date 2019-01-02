@@ -8,12 +8,17 @@ import time
 
 import coloredlogs
 import cv2 as cv
+
+#for linux compatible video
+import skvideo.io as skv
+
 import numpy as np
 import tensorflow as tf
 
 from datasources import Video, Webcam
 from models import ELG
 import util.gaze
+import util.eye_contact
 
 if __name__ == '__main__':
 
@@ -28,6 +33,9 @@ if __name__ == '__main__':
 
     parser.add_argument('--fps', type=int, default=60, help='Desired sampling rate of webcam')
     parser.add_argument('--camera_id', type=int, default=0, help='ID of webcam to use')
+    
+    parser.add_argument('--use_dlib_fd', type=bool, default=True, help='Choose between the dlib\'s or OpenCV\'s face detector')
+    parser.add_argument('--store_annotated_frames', type=bool, default=False, help='For evaluation purposes: store the theta/phi angles in angle_computed.txt')
 
     args = parser.parse_args()
     coloredlogs.install(
@@ -61,12 +69,14 @@ if __name__ == '__main__':
             data_source = Video(args.from_video,
                                 tensorflow_session=session, batch_size=batch_size,
                                 data_format='NCHW' if gpu_available else 'NHWC',
-                                eye_image_shape=(108, 180))
+                                eye_image_shape=(108, 180),
+                                face_detector_dlib = args.use_dlib_fd)
         else:
             data_source = Webcam(tensorflow_session=session, batch_size=batch_size,
                                  camera_id=args.camera_id, fps=args.fps,
                                  data_format='NCHW' if gpu_available else 'NHWC',
-                                 eye_image_shape=(36, 60))
+                                 eye_image_shape=(36, 60),
+                                 face_detector_dlib = args.use_dlib_fd)
 
         # Define model
         if args.from_video:
@@ -114,18 +124,21 @@ if __name__ == '__main__':
                     frame = data_source._frames[frame_index]['bgr']
                     h, w, _ = frame.shape
                     if video_out is None:
-                        video_out = cv.VideoWriter(
-                            args.record_video, cv.VideoWriter_fourcc(*'H264'),
-                            out_fps, (w, h),
-                        )
+                        # video_out = cv.VideoWriter(
+                        #     args.record_video, cv.VideoWriter_fourcc(*'H264'),
+                        #     out_fps, (w, h),
+                        # )
+                        video_out = skv.FFmpegWriter(args.record_video)
                     now_time = time.time()
                     if last_frame_time is not None:
                         time_diff = now_time - last_frame_time
                         while time_diff > 0.0:
-                            video_out.write(frame)
+                            #video_out.write(frame)
+                            video_out.writeFrame(np.flip(frame, axis=-1))
                             time_diff -= out_frame_interval
                     last_frame_time = now_time
-                video_out.release()
+                #video_out.release()
+                video_out.close()
                 with video_out_done:
                     video_out_done.notify_all()
             record_thread = threading.Thread(target=_record_frame, name='record')
@@ -145,6 +158,8 @@ if __name__ == '__main__':
                 cv.namedWindow('vis', cv.WND_PROP_FULLSCREEN)
                 cv.setWindowProperty('vis', cv.WND_PROP_FULLSCREEN, cv.WINDOW_FULLSCREEN)
 
+# Track frame index
+            previous_frame_index = 0
             while True:
                 # If no output to visualize, show unannotated frame
                 if inferred_stuff_queue.empty():
@@ -220,23 +235,10 @@ if __name__ == '__main__':
                     v2 = v1 + eh
                     u0 = 0 if eye_side == 'left' else ew
                     u1 = u0 + ew
-                    bgr[v0:v1, u0:u1] = eye_image_raw
-                    bgr[v1:v2, u0:u1] = eye_image_annotated
-
-                    # Visualize preprocessing results
-                    frame_landmarks = (frame['smoothed_landmarks']
-                                       if 'smoothed_landmarks' in frame
-                                       else frame['landmarks'])
-                    for f, face in enumerate(frame['faces']):
-                        for landmark in frame_landmarks[f][:-1]:
-                            cv.drawMarker(bgr, tuple(np.round(landmark).astype(np.int32)),
-                                          color=(0, 0, 255), markerType=cv.MARKER_STAR,
-                                          markerSize=2, thickness=1, line_type=cv.LINE_AA)
-                        cv.rectangle(
-                            bgr, tuple(np.round(face[:2]).astype(np.int32)),
-                            tuple(np.round(np.add(face[:2], face[2:])).astype(np.int32)),
-                            color=(0, 255, 255), thickness=1, lineType=cv.LINE_AA,
-                        )
+##Disable eye images to see the actual video
+                    if not args.from_video:
+                        bgr[v0:v1, u0:u1] = eye_image_raw
+                        bgr[v1:v2, u0:u1] = eye_image_annotated
 
                     # Transform predictions
                     eye_landmarks = np.concatenate([eye_landmarks,
@@ -259,11 +261,12 @@ if __name__ == '__main__':
                     if len(all_gaze_histories) != num_total_eyes_in_frame:
                         all_gaze_histories = [list() for _ in range(num_total_eyes_in_frame)]
                     gaze_history = all_gaze_histories[eye_index]
+                    
                     if can_use_eye:
                         # Visualize landmarks
                         cv.drawMarker(  # Eyeball centre
                             bgr, tuple(np.round(eyeball_centre).astype(np.int32)),
-                            color=(0, 255, 0), markerType=cv.MARKER_CROSS, markerSize=4,
+                            color=(0, 255, 255), markerType=cv.MARKER_CROSS, markerSize=4,
                             thickness=1, line_type=cv.LINE_AA,
                         )
                         # cv.circle(  # Eyeball outline
@@ -282,12 +285,30 @@ if __name__ == '__main__':
                         phi = np.arcsin(np.clip((i_x0 - e_x0) / (eyeball_radius * -np.cos(theta)),
                                                 -1.0, 1.0))
                         current_gaze = np.array([theta, phi])
+#Annotate the angle in a new file
+                        if args.store_annotated_frames :
+                            with open('angle_computed.txt', 'a+') as f:
+                                f.write('{} {} {}\n'.format(frame_index, phi, theta))                        
+#So that we can compute the precision later on
                         gaze_history.append(current_gaze)
                         gaze_history_max_len = 10
                         if len(gaze_history) > gaze_history_max_len:
                             gaze_history = gaze_history[-gaze_history_max_len:]
                         util.gaze.draw_gaze(bgr, iris_centre, np.mean(gaze_history, axis=0),
                                             length=120.0, thickness=1)
+                                            
+                        # Visualize preprocessing results
+                        frame_landmarks = (frame['smoothed_landmarks']
+                                           if 'smoothed_landmarks' in frame
+                                           else frame['landmarks'])
+                        for f, face in enumerate(frame['faces']):
+                            for landmark in frame_landmarks[f][:-1]:
+                                cv.drawMarker(bgr, tuple(np.round(landmark).astype(np.int32)),
+                                              color=(0, 0, 255), markerType=cv.MARKER_STAR,
+                                              markerSize=2, thickness=1, line_type=cv.LINE_AA)
+                            #Draw red if not eye-contact, green if eye-contact
+                            util.eye_contact.draw_contact(bgr, face, np.mean(gaze_history, axis=0))
+                        
                     else:
                         gaze_history.clear()
 
@@ -336,6 +357,14 @@ if __name__ == '__main__':
                         cv.putText(bgr, fps_str, org=(fw - 111, fh - 21),
                                    fontFace=cv.FONT_HERSHEY_DUPLEX, fontScale=0.79,
                                    color=(255, 255, 255), thickness=1, lineType=cv.LINE_AA)
+#Print the frame number if video to retrieve the image afterwards
+                        if args.from_video :
+                            cv.putText(bgr, "frame " + str(frame_index), org = (fw - 300, fh - 20),
+                                        fontFace = cv.FONT_HERSHEY_DUPLEX, fontScale=0.8,
+                                        color = (0,0,0), thickness = 1, lineType = cv.LINE_AA)
+                            cv.putText(bgr, "frame " + str(frame_index), org = (fw - 301, fh - 21),
+                                        fontFace = cv.FONT_HERSHEY_DUPLEX, fontScale=0.8,
+                                        color = (255,255,255), thickness = 1, lineType = cv.LINE_AA)
                         if not args.headless:
                             cv.imshow('vis', bgr)
                         last_frame_index = frame_index
