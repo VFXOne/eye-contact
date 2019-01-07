@@ -15,7 +15,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Create a video from MPIIGaze dataset')
     parser.add_argument('--number_of_frames', type=int, required=True, help='Specify the number of images to be taken for creating the video')
     parser.add_argument('--path', type=str, default='MPIIGaze', help='Specify the path where to find the dataset')    
-    parser.add_argument('--annotate_lines', type=bool, default=True, help='Annotate with "phi" and "theta" the corresponding angles int the annotation file')
+    parser.add_argument('--annotate_lines', type=bool, default=False, help='Annotate with "phi" and "theta" the corresponding angles in the annotation file')
 
     args = parser.parse_args()
 
