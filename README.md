@@ -1,5 +1,5 @@
 # Eye contact detection
-This is my bachelor semester project at the VITA laboratory (EPFL).
+This is my bachelor semester project at the [VITA](https://vita.epfl.ch/) laboratory (EPFL).
 
 ## Description
 The project is based on the gaze estimation algorithm from [https://github.com/swook/GazeML](https://github.com/swook/GazeML). It converts the output of the gaze estimation to classify whether the person is looking at the camera or not.
@@ -24,12 +24,12 @@ pip install coloredlogs numpy scipy cmake dlib matplotlib ujson opencv-python
 
 ## Demo
 You can run the algorithm from a webcam stream:
-```
+```shell
 cd src
 python eye-contact.py
 ```
 Or from a video, in this case you have to provide the path of the video. For example:
-```
+```shell
 cd src
 python eye-contact.py --from_video my-video.mp4
 ```
