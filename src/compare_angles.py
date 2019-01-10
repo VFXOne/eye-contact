@@ -3,6 +3,7 @@ import os
 import argparse
 import numpy as np
 import matplotlib.pyplot as plt
+from util import eye_contact
 
 if __name__ == '__main__':
     # Set arguments
@@ -40,6 +41,8 @@ if __name__ == '__main__':
 
     
     associated_frame = []
+
+    eye_contact_errors = []
     
     for truth_count in range(len(truth_list)):
     
@@ -74,14 +77,22 @@ if __name__ == '__main__':
         phi_values.append(phi_truth)
         phi_errors.append(absolute_error_phi_left)
 
+        truth_eye_contact = eye_contact.is_contact([theta_truth, phi_truth])
+        eye_contact_left = eye_contact.is_contact([theta_comp_left, phi_comp_left])
+        eye_contact_errors.append(truth_eye_contact == eye_contact_left)
+
         if (phi_comp_right is not None):
             absolute_error_theta_right = theta_truth - theta_comp_right
             absolute_error_phi_right = phi_truth - phi_comp_right
-            
+            eye_contact_right = eye_contact.is_contact([theta_comp_right, phi_comp_right])
+
+
             theta_values.append(theta_truth)
             theta_errors.append(absolute_error_theta_right)
             phi_values.append(phi_truth)
             phi_errors.append(absolute_error_phi_right)
+            eye_contact_errors.append(truth_eye_contact == eye_contact_right)
+
 
         associated_frame.append(comp_frame)
         
@@ -89,6 +100,9 @@ if __name__ == '__main__':
         
     computed_file.close()
     truth_file.close()
+
+    #Print eye contact detection accuracy
+    print('Eye contact accuracy: {:.04}%\n'.format(np.sum(eye_contact_errors)/len(eye_contact_errors)*100))
     
     plt.figure(1)
     plt.plot(theta_values, theta_errors, 'b.')
