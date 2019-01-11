@@ -34,7 +34,7 @@ if __name__ == '__main__':
     parser.add_argument('--fps', type=int, default=60, help='Desired sampling rate of webcam')
     parser.add_argument('--camera_id', type=int, default=0, help='ID of webcam to use')
     
-    parser.add_argument('--use_dlib_fd', type=bool, default=True, help='Choose between the dlib\'s or OpenCV\'s face detector')
+    parser.add_argument('--use_dlib_fd', type=str, default='true', help='Choose between the dlib\'s or OpenCV\'s face detector')
     parser.add_argument('--store_annotated_frames', type=bool, default=False, help='For evaluation purposes: store the theta/phi angles in angle_computed.txt')
 
     args = parser.parse_args()
@@ -43,6 +43,11 @@ if __name__ == '__main__':
         fmt='%(asctime)s %(levelname)s %(message)s',
         level=args.v.upper(),
     )
+    
+    if (args.use_dlib_fd == 'false') :
+        use_dlib = False
+    else :
+        use_dlib = True
 
     # Check if GPU is available
     from tensorflow.python.client import device_lib
@@ -70,13 +75,13 @@ if __name__ == '__main__':
                                 tensorflow_session=session, batch_size=batch_size,
                                 data_format='NCHW' if gpu_available else 'NHWC',
                                 eye_image_shape=(108, 180),
-                                face_detector_dlib = args.use_dlib_fd)
+                                face_detector_dlib = use_dlib)
         else:
             data_source = Webcam(tensorflow_session=session, batch_size=batch_size,
                                  camera_id=args.camera_id, fps=args.fps,
                                  data_format='NCHW' if gpu_available else 'NHWC',
                                  eye_image_shape=(36, 60),
-                                 face_detector_dlib = args.use_dlib_fd)
+                                 face_detector_dlib = use_dlib)
 
         # Define model
         if args.from_video:
