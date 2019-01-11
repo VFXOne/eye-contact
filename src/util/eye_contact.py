@@ -20,8 +20,9 @@ def draw_contact(image_in, face, gaze_vector):
     
             
 def is_contact(gaze_vector):
-    #The eye contact is defined as looking within a 5° range around the camera
-    max_angle = np.radians(5)
+    #The eye contact is defined as looking within a 3° range around the camera
+    #This seems to be a good compromise between accurracy and realism in live testing
+    max_angle = np.radians(3)
 
     phi = np.absolute(gaze_vector[1])
     theta = np.absolute(gaze_vector[0])
