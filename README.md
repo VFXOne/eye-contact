@@ -6,7 +6,7 @@ The project is based on the gaze estimation algorithm from [https://github.com/s
 
 ## Dependencies
 This project has been tested using Tensorflow 1.11 and Python 3.6.6 in an Anaconda 4.5.4 virtual environment.
-You'll have to install ```coloredlogs```, ```opencv```, ```numpy```, ```cmake```, ```dlib```, ```matplotlib``` (if you want to [evaluate the algorithm](https://github.com/VFXOne/eye-contact/wiki/Evaluating-the-algorithm)), ```scipy``` and ```ujson```.
+You'll have to install ```coloredlogs```, ```opencv```, ```numpy```, ```cmake```, ```dlib```, ```matplotlib``` (if you want to [evaluate the algorithm](https://github.com/VFXOne/eye-contact/wiki/Evaluating-the-algorithm)), ```scipy```, `sk-video` and ```ujson```.
 
 ## Install
 Navigate to the directory and run this command 
@@ -19,7 +19,7 @@ Tensorflow is assumed to be installed, you can follow the official guide [here](
 
 If you don't have any of the dependencies listed above you can run this command to install them all at once
 ```
-pip install coloredlogs numpy scipy cmake dlib matplotlib ujson opencv-python
+pip install coloredlogs numpy scipy cmake dlib matplotlib ujson opencv-python sk-video
 ```
 
 ## Demo
