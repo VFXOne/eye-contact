@@ -169,7 +169,6 @@ class FramesSource(BaseDataSource):
                 detections = detector.forward()
                 frameWidth = len(frame['bgr'][0,:,:])
                 frameHeight = len(frame['bgr'])
-                print('frame size: {}x{}'.format(frameHeight, frameWidth))
                 for i in range(detections.shape[2]):
                     confidence = detections[0, 0, i, 2]
                     conf_threshold = 0.9
