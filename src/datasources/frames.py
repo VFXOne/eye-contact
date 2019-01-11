@@ -15,6 +15,7 @@ import tensorflow as tf
 
 from core import BaseDataSource
 
+_face_detector_dlib = True
 
 class FramesSource(BaseDataSource):
     """Preprocessing of stream of frames."""
@@ -24,6 +25,7 @@ class FramesSource(BaseDataSource):
                  batch_size: int,
                  eye_image_shape: Tuple[int, int],
                  staging: bool=False,
+                 face_detector_dlib: bool=True,
                  **kwargs):
         """Create queues and threads to read and preprocess data."""
         self._eye_image_shape = eye_image_shape
@@ -40,12 +42,15 @@ class FramesSource(BaseDataSource):
         self._indices = []
         self._frames = {}
         self._open = True
+        
+        global _face_detector_dlib
+        _face_detector_dlib = face_detector_dlib
 
         # Call parent class constructor
         super().__init__(tensorflow_session, batch_size=batch_size, num_threads=1,
                          fread_queue_capacity=batch_size, preprocess_queue_capacity=batch_size,
                          shuffle=False, staging=staging, **kwargs)
-
+        
     _short_name = 'Frames'
 
     @property
@@ -139,22 +144,43 @@ class FramesSource(BaseDataSource):
         if ('last_face_detect_index' not in previous_frame or
                 frame['frame_index'] - previous_frame['last_face_detect_index'] > 59):
             detector = get_face_detector()
-            if detector.__class__.__name__ == 'CascadeClassifier':
-                detections = detector.detectMultiScale(frame['grey'])
-            else:
-                detections = detector(cv.resize(frame['grey'], (0, 0), fx=0.5, fy=0.5), 0)
             faces = []
-            for d in detections:
-                try:
-                    l, t, r, b = d.rect.left(), d.rect.top(), d.rect.right(), d.rect.bottom()
-                    l *= 2
-                    t *= 2
-                    r *= 2
-                    b *= 2
-                    w, h = r - l, b - t
-                except AttributeError:  # Using OpenCV LBP detector on CPU
-                    l, t, w, h = d
-                faces.append((l, t, w, h))
+            global _face_detector_dlib
+            if _face_detector_dlib :
+                if detector.__class__.__name__ == 'CascadeClassifier':
+                    detections = detector.detectMultiScale(frame['grey'])
+                else:
+                    detections = detector(cv.resize(frame['grey'], (0, 0), fx=0.5, fy=0.5), 0)
+                for d in detections:
+                    try:
+                        l, t, r, b = d.rect.left(), d.rect.top(), d.rect.right(), d.rect.bottom()
+                        l *= 2
+                        t *= 2
+                        r *= 2
+                        b *= 2
+                        w, h = r - l, b - t
+                    except AttributeError:  # Using OpenCV LBP detector on CPU
+                        l, t, w, h = d
+                    faces.append((l, t, w, h))
+                
+            else:
+                blob = cv.dnn.blobFromImage(cv.resize(frame['bgr'], (0, 0), fx=0.5, fy=0.5), 1.0, (300, 300), [104, 117, 123], False, False)
+                detector.setInput(blob)
+                detections = detector.forward()
+                frameWidth = len(frame['bgr'][0,:,:])
+                frameHeight = len(frame['bgr'])
+                print('frame size: {}x{}'.format(frameHeight, frameWidth))
+                for i in range(detections.shape[2]):
+                    confidence = detections[0, 0, i, 2]
+                    conf_threshold = 0.9
+                    if confidence > conf_threshold:
+                        l = int(detections[0, 0, i, 3] * frameWidth)
+                        t = int(detections[0, 0, i, 4] * frameHeight)
+                        r = int(detections[0, 0, i, 5] * frameWidth)
+                        b = int(detections[0, 0, i, 6] * frameHeight)
+                        w, h = r - l, b - t
+                        faces.append((l, t, w, h))
+                
             faces.sort(key=lambda bbox: bbox[0])
             frame['faces'] = faces
             frame['last_face_detect_index'] = frame['frame_index']
@@ -317,7 +343,6 @@ class FramesSource(BaseDataSource):
 _face_detector = None
 _landmarks_predictor = None
 
-
 def _get_dlib_data_file(dat_name):
     dat_dir = os.path.relpath('%s/../3rdparty' % os.path.basename(__file__))
     dat_path = '%s/%s' % (dat_dir, dat_name)
@@ -352,13 +377,21 @@ def _get_opencv_xml(xml_name):
 def get_face_detector():
     """Get a singleton dlib face detector."""
     global _face_detector
+    global _face_detector_dlib
     if not _face_detector:
-        try:
-            dat_path = _get_dlib_data_file('mmod_human_face_detector.dat')
-            _face_detector = dlib.cnn_face_detection_model_v1(dat_path)
-        except:
-            xml_path = _get_opencv_xml('lbpcascade_frontalface_improved.xml')
-            _face_detector = cv.CascadeClassifier(xml_path)
+        if _face_detector_dlib :
+            try:
+                dat_path = _get_dlib_data_file('mmod_human_face_detector.dat')
+                _face_detector = dlib.cnn_face_detection_model_v1(dat_path)
+            except:
+                xml_path = _get_opencv_xml('lbpcascade_frontalface_improved.xml')
+                _face_detector = cv.CascadeClassifier(xml_path)
+        else :
+            path = '{}/../3rdparty/'.format(os.path.basename(__file__))
+            modelFile = path +'opencv_face_detector_uint8.pb'
+            configFile = path + 'opencv_face_detector.pbtxt'
+            _face_detector = cv.dnn.readNetFromTensorflow(modelFile, configFile)
+            
     return _face_detector
 
 
